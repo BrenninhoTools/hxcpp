@@ -381,6 +381,33 @@ int _hx_std_host_resolve( String host )
    ip = inet_addr(host.utf8_str(&buf));
    if( ip == INADDR_NONE )
    {
+      hx::strbuf lookupBuf;
+      const char *lookup = host.utf8_str(&lookupBuf);
+      struct addrinfo hints;
+      struct addrinfo *result = 0;
+      memset(&hints, 0, sizeof(hints));
+      hints.ai_family = AF_INET;
+      hints.ai_socktype = SOCK_STREAM;
+      if( getaddrinfo(lookup, 0, &hints, &result) == 0 && result )
+      {
+         for( struct addrinfo *entry = result; entry; entry = entry->ai_next )
+         {
+            if( entry->ai_family == AF_INET && entry->ai_addr )
+            {
+               ip = ((struct sockaddr_in *)entry->ai_addr)->sin_addr.s_addr;
+               break;
+            }
+         }
+         freeaddrinfo(result);
+         if( ip != INADDR_NONE )
+         {
+            hx::ExitGCFreeZone();
+            return ip;
+         }
+      }
+   }
+   if( ip == INADDR_NONE )
+   {
       struct hostent *h = 0;
       hx::strbuf hostBuf;
 

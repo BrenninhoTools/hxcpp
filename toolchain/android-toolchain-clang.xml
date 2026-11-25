@@ -108,7 +108,7 @@
   <flag value="-Wl,--thinlto-cache-dir=${HXCPP_COMPILE_CACHE}/thinlto" if="HXCPP_LTO_THIN HXCPP_COMPILE_CACHE" unless="debug" />
 
   <flag value="-stdlib=libc++" unless="NDKV20+" />
-  <flag value ="-static-libstdc++" />
+  <flag value ="-static-libstdc++" unless="HXCPP_ANDROID_SHARED_STL" />
   <!-- This shows the android link line, which may be so long that it breaks the tool
      https://github.com/HaxeFoundation/hxcpp/pull/1091
      <flag value ="-v" />
@@ -131,7 +131,7 @@
 
   <flag value="-Wl,--no-undefined" unless="HXCPP_ALLOW_UNDEFINED" />
 
-  <flag value="-static-libstdc++" />
+  <flag value="-static-libstdc++" unless="HXCPP_ANDROID_SHARED_STL" />
 
   <lib name="-llog" />
 

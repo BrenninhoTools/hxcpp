@@ -4,6 +4,11 @@ BrenninhoTools fork
 * Android: release builds use -fdata-sections and link with --gc-sections and --icf=safe for smaller and faster loading libraries
 * Android: HXCPP_ANDROID_NO_GC_SECTIONS and HXCPP_ANDROID_NO_ICF turn those off
 * Android: ThinLTO with HXCPP_OPTIMIZE_LINK_INCREMENTAL, the LTO flags are passed to the linker and the ThinLTO cache uses HXCPP_COMPILE_CACHE
+* SSL: Certificate.loadDefaults finds the system CA store on Linux and Android (bundle files, /system/etc/security/cacerts and the Android 14 conscrypt APEX), so wss:// and https:// verify certificates there
+* SSL: HXCPP_SSL_CA_FILE, SSL_CERT_FILE and SSL_CERT_DIR point to a custom CA store
+* SSL: the default CA chain is parsed once and reused by every connection, set HXCPP_SSL_NO_CACHE to reload it each time
+* Sockets: host names resolve with getaddrinfo first, which is thread safe and follows the system resolver, with gethostbyname as a fallback
+* Android: HXCPP_ANDROID_SHARED_STL links against libc++_shared.so instead of the static C++ runtime, for apps that already ship it with a native library such as libVLC
 
 
 4.3.xx

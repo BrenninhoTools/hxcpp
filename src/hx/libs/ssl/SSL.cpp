@@ -1,4 +1,7 @@
 #include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <mutex>
 
 #ifdef HX_WINDOWS
 #   include <winsock2.h>
@@ -527,7 +530,34 @@ void _hx_ssl_conf_set_servername_callback( Dynamic hconf, Dynamic cb ){
 	mbedtls_ssl_conf_sni( conf->c, sni_callback, (void *)cb.mPtr );
 }
 
-Dynamic _hx_ssl_cert_load_defaults(){
+static sslcert *_hx_ssl_cert_try_file( const char *file ){
+	if( !file || !file[0] ) return NULL;
+	FILE *f = fopen( file, "rb" );
+	if( !f ) return NULL;
+	fclose( f );
+	sslcert *chain = new sslcert();
+	chain->create( NULL );
+	int r = mbedtls_x509_crt_parse_file( chain->c, file );
+	if( r < 0 || chain->c->version == 0 ){
+		chain->destroy();
+		return NULL;
+	}
+	return chain;
+}
+
+static sslcert *_hx_ssl_cert_try_path( const char *path ){
+	if( !path || !path[0] ) return NULL;
+	sslcert *chain = new sslcert();
+	chain->create( NULL );
+	int r = mbedtls_x509_crt_parse_path( chain->c, path );
+	if( r < 0 || chain->c->version == 0 ){
+		chain->destroy();
+		return NULL;
+	}
+	return chain;
+}
+
+static Dynamic _hx_ssl_cert_load_system(){
 #if defined(NEKO_WINDOWS)
 	HCERTSTORE store;
 	PCCERT_CONTEXT cert;
@@ -590,8 +620,76 @@ Dynamic _hx_ssl_cert_load_defaults(){
 	CFRelease(keychain);
 	if( chain != NULL )
 		return chain;
+#elif !defined(IPHONE) && !defined(APPLETV) && !defined(HX_WINDOWS)
+	static const char *files[] = {
+		"/etc/ssl/certs/ca-certificates.crt",
+		"/etc/pki/tls/certs/ca-bundle.crt",
+		"/etc/ssl/ca-bundle.pem",
+		"/etc/pki/tls/cacert.pem",
+		"/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem",
+		"/etc/ssl/cert.pem",
+		"/usr/local/etc/openssl/cert.pem",
+		NULL
+	};
+	static const char *dirs[] = {
+		"/apex/com.android.conscrypt/cacerts",
+		"/system/etc/security/cacerts",
+		"/etc/ssl/certs",
+		"/etc/pki/tls/certs",
+		NULL
+	};
+	for( int i = 0; files[i]; i++ ){
+		sslcert *chain = _hx_ssl_cert_try_file( files[i] );
+		if( chain ) return chain;
+	}
+	for( int i = 0; dirs[i]; i++ ){
+		sslcert *chain = _hx_ssl_cert_try_path( dirs[i] );
+		if( chain ) return chain;
+	}
 #endif
 	return null();
+}
+
+static hx::Object *_hx_ssl_default_chain = NULL;
+static bool _hx_ssl_default_loaded = false;
+
+static std::mutex _hx_ssl_default_lock;
+
+Dynamic _hx_ssl_cert_load_defaults(){
+	hx::EnterGCFreeZone();
+	_hx_ssl_default_lock.lock();
+	hx::ExitGCFreeZone();
+
+	if( _hx_ssl_default_loaded && getenv("HXCPP_SSL_NO_CACHE") == NULL ){
+		Dynamic cached = Dynamic(_hx_ssl_default_chain);
+		_hx_ssl_default_lock.unlock();
+		return cached;
+	}
+
+	Dynamic result = null();
+	const char *custom = getenv("HXCPP_SSL_CA_FILE");
+	if( !custom ) custom = getenv("SSL_CERT_FILE");
+	if( custom ){
+		sslcert *chain = _hx_ssl_cert_try_file( custom );
+		if( chain ) result = chain;
+	}
+	if( result == null() ){
+		const char *dir = getenv("SSL_CERT_DIR");
+		if( dir ){
+			sslcert *chain = _hx_ssl_cert_try_path( dir );
+			if( chain ) result = chain;
+		}
+	}
+	if( result == null() )
+		result = _hx_ssl_cert_load_system();
+
+	if( !_hx_ssl_default_loaded ){
+		hx::GCAddRoot( &_hx_ssl_default_chain );
+		_hx_ssl_default_loaded = true;
+	}
+	_hx_ssl_default_chain = result.mPtr;
+	_hx_ssl_default_lock.unlock();
+	return result;
 }
 
 Dynamic _hx_ssl_cert_load_file( String file ){
