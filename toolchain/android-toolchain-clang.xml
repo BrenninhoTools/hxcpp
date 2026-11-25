@@ -37,6 +37,8 @@
 
 <include name="toolchain/gcc-toolchain.xml"/>
 
+<set name="HXCPP_LTO_THIN" value="1" if="HXCPP_OPTIMIZE_LINK_INCREMENTAL"/>
+
 <compiler id="android-gcc" exe="clang++">
 
   <exe name="clang++" />
@@ -61,9 +63,11 @@
   <flag value="-DHXCPP_ANDROID_PLATFORM=${HXCPP_ANDROID_PLATFORM}" />
 
   <!-- Options -->
-  <flag value="-flto" if="HXCPP_OPTIMIZE_LINK" unless="debug"/>
+  <flag value="-flto" if="HXCPP_OPTIMIZE_LINK" unless="debug || HXCPP_LTO_THIN"/>
+  <flag value="-flto=thin" if="HXCPP_LTO_THIN" unless="debug"/>
   <flag value="-fvisibility=hidden"/>
   <flag value="-ffunction-sections"/>
+  <flag value="-fdata-sections" unless="debug"/>
   <flag value="-fstack-protector"/>
   <flag value="-fexceptions"/>
   <flag value="-g" if="HXCPP_DEBUG_LINK"/>
@@ -96,6 +100,12 @@
     <!-- Extra 16KB alignment workaround for NDK r22 and below -->
     <flag value="-Wl,-z,common-page-size=16384" unless="NDKV23+" />
   </section>
+
+  <flag value="-Wl,--gc-sections" unless="debug || HXCPP_ANDROID_NO_GC_SECTIONS" />
+  <flag value="-Wl,--icf=safe" if="NDKV23+" unless="debug || HXCPP_ANDROID_NO_ICF" />
+  <flag value="-flto" if="HXCPP_OPTIMIZE_LINK" unless="debug || HXCPP_LTO_THIN" />
+  <flag value="-flto=thin" if="HXCPP_LTO_THIN" unless="debug" />
+  <flag value="-Wl,--thinlto-cache-dir=${HXCPP_COMPILE_CACHE}/thinlto" if="HXCPP_LTO_THIN HXCPP_COMPILE_CACHE" unless="debug" />
 
   <flag value="-stdlib=libc++" unless="NDKV20+" />
   <flag value ="-static-libstdc++" />

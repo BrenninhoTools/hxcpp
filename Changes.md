@@ -1,3 +1,10 @@
+BrenninhoTools fork
+------------------------------------------------------------
+
+* Android: release builds use -fdata-sections and link with --gc-sections and --icf=safe for smaller and faster loading libraries
+* Android: HXCPP_ANDROID_NO_GC_SECTIONS and HXCPP_ANDROID_NO_ICF turn those off
+* Android: ThinLTO with HXCPP_OPTIMIZE_LINK_INCREMENTAL, the LTO flags are passed to the linker and the ThinLTO cache uses HXCPP_COMPILE_CACHE
+
 
 4.3.xx
 ------------------------------------------------------------
